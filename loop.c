@@ -142,8 +142,13 @@ void loop_add_fd(struct loop *loop, int fd, short mask,
 
 	if (loop->fd_length == loop->fd_capacity) {
 		loop->fd_capacity += 10;
-		loop->fds = realloc(loop->fds,
+		struct pollfd *fds = realloc(loop->fds,
 				sizeof(struct pollfd) * loop->fd_capacity);
+		if (!fds) {
+			swaylock_log(LOG_ERROR, "Unable to realloc fds");
+			return;
+		}
+		loop->fds = fds;
 	}
 
 	loop->fds[loop->fd_length++] = pfd;
