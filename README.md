@@ -5,29 +5,30 @@ which adds built-in screenshots and image manipulation effects like blurring.
 It's inspired by [i3lock-color](https://github.com/PandorasFox/i3lock-color),
 although the feature sets aren't perfectly overlapping.
 
-This repository is a fork of [jirutka/swaylock-effects](https://github.com/jirutka/swaylock-effects)
-which in its turn is a fork of [mortie/swaylock-effects](https://github.com/mortie/swaylock-effects),
- both are no longer maintained.
+This repository ([hboetes/swaylock-effects](https://github.com/hboetes/swaylock-effects))
+is a fork of [mortie/swaylock-effects](https://github.com/mortie/swaylock-effects),
+via [jirutka/swaylock-effects](https://github.com/jirutka/swaylock-effects),
+both of which are now unmaintained.
 
-![Screenshot](https://raw.githubusercontent.com/jirutka/swaylock-effects/master/screenshot.png)
+![Screenshot](https://raw.githubusercontent.com/hboetes/swaylock-effects/master/screenshot.png)
 
 ## Example Command
 
-	swaylock \
-		--screenshots \
-		--clock \
-		--indicator \
-		--indicator-radius 100 \
-		--indicator-thickness 7 \
-		--effect-blur 7x5 \
-		--effect-vignette 0.5:0.5 \
-		--ring-color bb00cc \
-		--key-hl-color 880033 \
-		--line-color 00000000 \
-		--inside-color 00000088 \
-		--separator-color 00000000 \
-		--grace 2 \
-		--fade-in 0.2
+    swaylock \
+        --screenshots \
+        --clock \
+        --indicator \
+        --indicator-radius 100 \
+        --indicator-thickness 7 \
+        --effect-blur 7x5 \
+        --effect-vignette 0.5:0.5 \
+        --ring-color bb00cc \
+        --key-hl-color 880033 \
+        --line-color 00000000 \
+        --inside-color 00000088 \
+        --separator-color 00000000 \
+        --grace 2 \
+        --fade-in 0.2
 
 ## New Features
 
@@ -35,77 +36,46 @@ The main new features compared to upstream swaylock are:
 
 * `--screenshots` to use screenshots instead of an image on disk or a color
 * `--clock` to show date/time in the indicator
-	* Use `--indicator` to make the indicator always active
-	* Use `--timestr` and `--datestr` to set the date/time formats
-	  (using strftime-style formatting)
+    * Use `--indicator` to make the indicator always active
+    * Use `--timestr` and `--datestr` to set the date/time formats
+      (using strftime-style formatting)
 * `--submit-on-touch` to use your touchscreen to submit a password.
   If you can unlock your device with anything else than your password,
   this might come helpful to trigger PAM's authentication process.
 * `--grace <seconds>` to set a password grace period, so that the password
   isn't required to unlock until some number of seconds have passed.
-	* Used together with `--indicator`, the indicator is always shown,
-	  even in the grace period.
-	* Used together with `--indicator-idle-visible`, the indicator is only
-	  visible after the grace period.
-	* By default, a key press, a mouse event or a touch event will unlock
-	  during the grace period. Use `--grace-no-mouse` to not unlock as a response
-	  to a mouse event, and `--grace-no-touch` to not unlock as a response to
-	  a touch event.
+    * Used together with `--indicator`, the indicator is always shown,
+      even in the grace period.
+    * Used together with `--indicator-idle-visible`, the indicator is only
+      visible after the grace period.
+    * By default, a key press, a mouse event or a touch event will unlock
+      during the grace period. Use `--grace-no-mouse` to not unlock as a response
+      to a mouse event, and `--grace-no-touch` to not unlock as a response to
+      a touch event.
 * `--fade-in <seconds>` to make the lock screen fade in.
 * `--indicator-image <path>` to display an image inside the indicator.
 * `--text-clear <string>`, `--text-caps-lock <string>`, `--text-ver <string>`,
   and `--text-wrong <string>` to change the texts displayed inside the indicator.
+* `-p, --fingerprint` to unlock with a fingerprint scanner via fprintd.
+* `-P, --fingerprint-on-demand` for external fingerprint scanners that time out after ~2 minutes.
+  Press ESC or C-u to activate the scanner after locking.
+* `--image <path>` now accepts a directory, picking a random image file from it.
 * Various effects which can be applied to the background image
-	* `--effect-blur <radius>x<times>`: Blur the image (thanks to yvbbrjdr's
-	  fast box blur algorithm in
-	  [i3lock-fancy-rapid](https://github.com/yvbbrjdr/i3lock-fancy-rapid))
-	* `--effect-pixelate <factor>`: Pixelate the image.
-	* `--effect-scale <scale>`: Scale the image by a factor. This can be used
-	  to make other effects faster if you don't need the full resolution.
-	* `--effect-greyscale`: Make the image greyscale.
-	* `--effect-vignette <base>:<factor>`: Apply a vignette effect (range is 0-1).
-	* `--effect-compose <position>;<size>;<gravity>;<path>`: Overlay another image.
-	* `--effect-custom <path>`: Load a custom effect from a C file or shared object.
+    * `--effect-blur <radius>x<times>`: Blur the image (thanks to yvbbrjdr's
+      fast box blur algorithm in
+      [i3lock-fancy-rapid](https://github.com/yvbbrjdr/i3lock-fancy-rapid))
+    * `--effect-pixelate <factor>`: Pixelate the image.
+    * `--effect-scale <scale>`: Scale the image by a factor. This can be used
+      to make other effects faster if you don't need the full resolution.
+    * `--effect-greyscale`: Make the image greyscale.
+    * `--effect-vignette <base>:<factor>`: Apply a vignette effect (range is 0-1).
+    * `--effect-compose <position>;<size>;<gravity>;<path>`: Overlay another image.
+    * `--effect-custom <path>`: Load a custom effect from a C file or shared object.
 
 New feature ideas are welcome as issues (though I may never get around to
 implement them), new feature implementations are welcome as pull requests :)
 
-## Versions
-
-swaylock-effects continuously incorporates changes from the original [swaylock](https://github.com/swaywm/swaylock).
-The following table shows the relation between the swaylock-effect and swaylock versions.
-
-| swaylock-effects | swaylock (original)                                                                                 |
-| ---------------- | --------------------------------------------------------------------------------------------------- |
-| 1.6-0            | [1.5](https://github.com/swaywm/swaylock/tree/1.5)                                                  |
-| 1.6-1            | 1.5-7-g[a99afe6a](https://github.com/swaywm/swaylock/tree/a99afe6a7075c962da72b140f02e18318052d833) |
-| 1.6-2            | 1.5-9-g[235b925d](https://github.com/swaywm/swaylock/tree/235b925df7e1bb82d98f1ac8c02e8f85d0a54ee9) |
-| 1.6-3            | 1.5-9-g[235b925d](https://github.com/swaywm/swaylock/tree/235b925df7e1bb82d98f1ac8c02e8f85d0a54ee9) |
-| 1.6.10           | [1.6](https://github.com/swaywm/swaylock/tree/1.6)                                                  |
-| 1.6.11           | [1.6](https://github.com/swaywm/swaylock/tree/1.6)                                                  |
-| 1.7.0.0          | 1.7-8-g[b4e3a2b](https://github.com/swaywm/swaylock/tree/10ab8b274020a9323413d093c45f13490929fb81)  |
-
-
 ## Installation
-
-### From Packages
-
-* Alpine Linux: [swaylock-effects](https://pkgs.alpinelinux.org/packages?name=swaylock-effects)
-* Arch Linux (AUR): [swaylock-effects](https://aur.archlinux.org/packages/swaylock-effects/) / [swaylock-effects-git](https://aur.archlinux.org/packages/swaylock-effects-git/)
-* Fedora (Copr): [swaylock-effects](https://copr.fedorainfracloud.org/coprs/trs-sod/swaylock-effects)
-* FreeBSD: [swaylock-effects](https://www.freshports.org/x11/swaylock-effects/)
-* Guix: [swaylock-effects](https://packages.guix.gnu.org/packages/swaylock-effects)
-* Nix: [swaylock-effects](https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/window-managers/sway/lock-effects.nix)
-
-The original [mortie/swaylock-effects](https://github.com/mortie/swaylock-effects) (now unmaintained)
-has been packaged for:
-
-* Fedora (Copr): [swaylock-effects](https://copr.fedorainfracloud.org/coprs/eddsalkield/swaylock-effects/)
-  (thanks to Edd Salkield)
-* Gentoo (GURU overlay): [swaylock-effects](https://gpo.zugaina.org/Overlays/guru/gui-apps/swaylock-effects)
-* T2 SDE: [swaylock-effects](https://t2sde.org/packages/swaylock-effects)
-
-### Compiling from Source
 
 Install dependencies:
 
@@ -116,6 +86,7 @@ Install dependencies:
 * cairo
 * gdk-pixbuf2 \*\*
 * pam (optional)
+* fprintd (optional: fingerprint support)
 * [scdoc](https://git.sr.ht/~sircmpwn/scdoc) (optional: man pages) \*
 * git \*
 * openmp (if using a compiler other than GCC)
@@ -126,13 +97,15 @@ _\*\*Optional: required for background images other than PNG_
 
 Run these commands:
 
-	meson build
-	ninja -C build
-	sudo ninja -C build install
+    meson setup build
+    ninja -C build
+    sudo ninja -C build install
+
+Check `meson_options.txt` for build options. So for example, if you want to build with fingerprint support, use `meson setup build -Dfingerprint=enabled`
 
 On systems without PAM, you need to suid the swaylock binary:
 
-	sudo chmod a+s /usr/local/bin/swaylock
+    sudo chmod a+s /usr/local/bin/swaylock
 
 Swaylock will drop root permissions shortly after startup.
 
@@ -179,23 +152,23 @@ Base and factor should be between 0 and 1.
 `--effect-compose "<position>;<size>;<gravity>;<path>"`: Overlay another image to your lock screen.
 
 * `<position>`: Optional. The position on the screen to put the image, as `<x>,<y>`.
-	* Can be a percentage (`10%,10%`), a number of pixels (`20,20`), or a mix (`30%,40`).
-	* A negative number indicates that number of pixels away from the right/bottom instead of
-	  from the top/left; `-1,-1` would be the bottom right pixel.
-	* Default: `50%,50%`.
+    * Can be a percentage (`10%,10%`), a number of pixels (`20,20`), or a mix (`30%,40`).
+    * A negative number indicates that number of pixels away from the right/bottom instead of
+      from the top/left; `-1,-1` would be the bottom right pixel.
+    * Default: `50%,50%`.
 * `<size>`: Optional. The size of the image on the screen, as `<w>x<h>`.
-	* Can be a percentage (`10%x10%`), a number of pixels (`20x20`), or a mix (`30%x40`).
-	* If the width is `-1`, the width is figured out based on the height and aspect ratio.
-	* If the height is `-1`, the height is figured out based on the width and aspect ratio.
-	* Default: The size of the image file.
+    * Can be a percentage (`10%x10%`), a number of pixels (`20x20`), or a mix (`30%x40`).
+    * If the width is `-1`, the width is figured out based on the height and aspect ratio.
+    * If the height is `-1`, the height is figured out based on the width and aspect ratio.
+    * Default: The size of the image file.
 * `<gravity>`: Optional. Determine which point of the image is placed at `<position>`.
-	* Possible values: `center`, `north`, `south`, `west`, `east`,
-	  `northwest`, `northeast`, southwest`, `southeast`.
-	* With a `<gravity>` of `northwest`, `<position>` gives the location of the top/left
-	  corner of the image; with `southeast`, `<position>` controls the bottom/right corner,
-	  `center` controls the middle of the image, etc.
-	* Default: `center` if no `<position>` is given; otherwise, intelligently decide a gravity
-	  based on position (`10,10` -> northwest, `-10,10` -> northeast, etc).
+    * Possible values: `center`, `north`, `south`, `west`, `east`,
+      `northwest`, `northeast`, southwest`, `southeast`.
+    * With a `<gravity>` of `northwest`, `<position>` gives the location of the top/left
+      corner of the image; with `southeast`, `<position>` controls the bottom/right corner,
+      `center` controls the middle of the image, etc.
+    * Default: `center` if no `<position>` is given; otherwise, intelligently decide a gravity
+      based on position (`10,10` -> northwest, `-10,10` -> northeast, etc).
 * `<path>`: The path to an image file.
 
 This command requires swaylock-effects to be compiled with gdk-pixbuf2.
@@ -208,3 +181,37 @@ png, jpeg, gif, svg, bmp, ico, tiff, wmf, ani, icns, pnm, qtif, tga, xbm and xpm
 
 The .so must export a function `void swaylock_effect(uint32_t *data, int width, int height)`
 or a function `uint32_t swaylock_pixel(uint32_t pix, int x, int y, int width, int height)`.
+
+### Integration into your window manager configuration
+To make `swaylock-effect` easy to start from your window manager you could write a wrapper script, and add it to your `PATH`, something like this:
+
+```
+#!/bin/zsh
+
+case "$1" in
+    now)
+        grace=0
+        fade=0
+        ;;
+    *)
+        grace=10
+        fade=5
+    ;;
+esac
+
+swaylock \
+    --clock \
+    --effect-vignette 0.5:0.5 \
+    --fade-in $fade \
+    --fingerprint \
+    --indicator-caps-lock \
+    --indicator-radius 100 \
+    --indicator-thickness 7 \
+    --inside-color 00000088 \
+    --key-hl-color 880033 \
+    --line-color 00000000 \
+    --ring-color bb00cc \
+    --separator-color 00000000 \
+    --image /home/han/Wallpapers/lockscreen \
+    --grace $grace
+```
