@@ -70,7 +70,6 @@ The main new features compared to upstream swaylock are:
     * `--effect-greyscale`: Make the image greyscale.
     * `--effect-vignette <base>:<factor>`: Apply a vignette effect (range is 0-1).
     * `--effect-compose <position>;<size>;<gravity>;<path>`: Overlay another image.
-    * `--effect-custom <path>`: Load a custom effect from a C file or shared object.
 
 New feature ideas are welcome as issues (though I may never get around to
 implement them), new feature implementations are welcome as pull requests :)
@@ -175,12 +174,6 @@ This command requires swaylock-effects to be compiled with gdk-pixbuf2.
 It supports all image formats gdk-pixbuf2 supports; on my system, that's
 png, jpeg, gif, svg, bmp, ico, tiff, wmf, ani, icns, pnm, qtif, tga, xbm and xpm.
 
-### Custom
-
-`--effect-custom <path>`: Load a custom effect from a shared object.
-
-The .so must export a function `void swaylock_effect(uint32_t *data, int width, int height)`
-or a function `uint32_t swaylock_pixel(uint32_t pix, int x, int y, int width, int height)`.
 
 ### Integration into your window manager configuration
 To make `swaylock-effect` easy to start from your window manager you could write a wrapper script, and add it to your `PATH`, something like this:

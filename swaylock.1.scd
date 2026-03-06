@@ -259,13 +259,6 @@ Locks your Wayland session.
 	Overlay another image to your lock screen.
 	The _position_, _size_ and _gravity_ part is optional.
 
-*--effect-custom <path>*
-	Load a custom effect from a shared object. The .so must export a++
-*void swaylock_effect(uint32\_t \*data, int width, int height, int scale)*++
-or an *uint32\_t swaylock_pixel(uint32\_t pix, int x, int y, int width, int height)*.
-
-*--time-effects*
-	Measure the time it takes to run each effect.
 
 # SIGNALS
 

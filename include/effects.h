@@ -41,7 +41,6 @@ struct swaylock_effect {
 			} gravity;
 			char *imgpath;
 		} compose;
-		char *custom;
 	} e;
 
 	enum {
@@ -51,14 +50,10 @@ struct swaylock_effect {
 		EFFECT_GREYSCALE,
 		EFFECT_VIGNETTE,
 		EFFECT_COMPOSE,
-		EFFECT_CUSTOM,
 	} tag;
 };
 
 cairo_surface_t *swaylock_effects_run(cairo_surface_t *surface, int scale,
-		struct swaylock_effect *effects, int count);
-
-cairo_surface_t *swaylock_effects_run_timed(cairo_surface_t *surface, int scale,
 		struct swaylock_effect *effects, int count);
 
 #endif

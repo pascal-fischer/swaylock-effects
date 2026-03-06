@@ -4,14 +4,11 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <dlfcn.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <spawn.h>
 #include <time.h>
 #include <stdio.h>
 #include "effects.h"
@@ -50,19 +47,6 @@ static int screen_pos_to_pix(struct swaylock_effect_screen_pos pos, int screensi
 	return actual;
 }
 
-static const char *effect_name(struct swaylock_effect *effect) {
-	switch (effect->tag) {
-	case EFFECT_BLUR: return "blur";
-	case EFFECT_PIXELATE: return "pixelate";
-	case EFFECT_SCALE: return "scale";
-	case EFFECT_GREYSCALE: return "greyscale";
-	case EFFECT_VIGNETTE: return "vignette";
-	case EFFECT_COMPOSE: return "compose";
-	case EFFECT_CUSTOM: return effect->e.custom;
-	}
-
-	abort();
-}
 
 static void screen_pos_pair_to_pix(
 		struct swaylock_effect_screen_pos posx,
@@ -425,165 +409,6 @@ static void effect_compose(uint32_t *data, int width, int height, int scale,
 #endif
 }
 
-static void effect_custom_run(uint32_t *data, int width, int height, int scale,
-		char *path) {
-	void *dl = dlopen(path, RTLD_LAZY);
-	if (dl == NULL) {
-		swaylock_log(LOG_ERROR, "Custom effect: %s", dlerror());
-		return;
-	}
-
-	void (*effect_func)(uint32_t *data, int width, int height, int scale) =
-		dlsym(dl, "swaylock_effect");
-	if (effect_func != NULL) {
-		effect_func(data, width, height, scale);
-		dlclose(dl);
-		return;
-	}
-
-	uint32_t (*pixel_func)(uint32_t pix, int x, int y, int width, int height) =
-		dlsym(dl, "swaylock_pixel");
-	if (pixel_func != NULL) {
-#pragma omp parallel for
-		for (int y = 0; y < height; ++y) {
-			for (int x = 0; x < width; ++x) {
-				data[y * width + x] =
-					pixel_func(data[y * width + x], x, y, width, height);
-			}
-		}
-
-		dlclose(dl);
-		return;
-	}
-
-	(void)dlsym(dl, "swaylock_effect"); // Change the result of dlerror()
-	swaylock_log(LOG_ERROR, "Custom effect: %s", dlerror());
-}
-
-static bool file_is_outdated(const char *input, const char *output) {
-	struct stat instat, outstat;
-	if (stat(input, &instat) < 0) {
-		return true;
-	}
-
-	if (stat(output, &outstat) < 0) {
-		return true;
-	}
-
-	if (instat.st_mtim.tv_sec > outstat.st_mtim.tv_sec) {
-		return true;
-	}
-
-	if (
-			instat.st_mtim.tv_sec == outstat.st_mtim.tv_sec &&
-			instat.st_mtim.tv_nsec >= outstat.st_mtim.tv_nsec) {
-		return true;
-	}
-
-	return false;
-}
-
-static char *effect_custom_compile(const char *path) {
-	static char *cachepath = NULL;
-	static size_t cachelen;
-	if (!cachepath) {
-		char *xdgdir = getenv("XDG_DATA_HOME");
-		if (xdgdir) {
-			cachepath = malloc(strlen(xdgdir) + strlen("/swaylock") + 1);
-			cachelen = sprintf(cachepath, "%s/swaylock", xdgdir);
-		} else {
-			char *homedir = getenv("HOME");
-			if (homedir == NULL) {
-				swaylock_log(LOG_ERROR,
-						"Can't compile custom effect; neither $HOME nor $XDG_CONFIG_HOME "
-						"is defined.");
-				return NULL;
-			}
-
-			cachepath = malloc(strlen(homedir) + strlen("/.cache/swaylock") + 1);
-			cachelen = sprintf(cachepath, "%s/.cache/swaylock", homedir);
-		}
-
-		if (mkdir(cachepath, 0777) < 0 && errno != EEXIST) {
-			swaylock_log(LOG_ERROR,
-					"Can't compile custom effect; mkdir %s failed: %s\n",
-					cachepath, strerror(errno));
-			free(cachepath);
-			cachepath = NULL;
-			return NULL;
-		}
-	}
-
-	// Find the true, absolute path of the input file
-	char *abspath = realpath(path, NULL);
-	if (abspath == NULL) {
-		swaylock_log(LOG_ERROR, "Custom effect: failed to resolve path '%s': %s",
-				path, strerror(errno));
-		return NULL;
-	}
-	size_t abspathlen = strlen(abspath);
-
-	char *outpath = malloc(cachelen + 1 + abspathlen + 3 + 1);
-	size_t outlen = sprintf(outpath, "%s/%s.so", cachepath, abspath);
-
-	// Sanitize
-	for (char *ch = outpath + cachelen + 1; ch < outpath + cachelen + 1 + abspathlen; ++ch) {
-		if (!(
-				(*ch >= 'a' && *ch <= 'z') ||
-				(*ch >= 'A' && *ch <= 'Z') ||
-				(*ch >= '0' && *ch <= '9') ||
-				(*ch == '.'))) {
-			*ch = '_';
-		}
-	}
-
-	if (!file_is_outdated(path, outpath)) {
-		free(abspath);
-		return outpath;
-	}
-
-	static const char *fmt = "cc -shared -g -O2 -march=native -fopenmp -o '%s' '%s' -lm";
-	char *cmd = malloc(strlen(fmt) + outlen - 2 + abspathlen - 2 + 1);
-	sprintf(cmd, fmt, outpath, abspath);
-	free(abspath);
-	fprintf(stderr, "Compiling custom effect: %s\n", cmd);
-
-	// Finally, compile.
-	int ret = system(cmd);
-	free(cmd);
-	if (ret != 0) {
-		if (ret == -1) {
-			swaylock_log(LOG_ERROR, "Custom effect: system(): %s", strerror(errno));
-			free(outpath);
-			return NULL;
-		} else {
-			swaylock_log(LOG_ERROR, "Custom effect compilation failed\n");
-			free(outpath);
-			return NULL;
-		}
-	}
-
-	return outpath;
-}
-
-static void effect_custom(uint32_t *data, int width, int height, int scale,
-		char *path) {
-	size_t pathlen = strlen(path);
-	if (pathlen > 3 && strcmp(path + pathlen - 3, ".so") == 0) {
-		effect_custom_run(data, width, height, scale, path);
-	} else if (pathlen > 2 && strcmp(path + pathlen - 2, ".c") == 0) {
-		char *compiled = effect_custom_compile(path);
-		if (compiled != NULL) {
-			effect_custom_run(data, width, height, scale, compiled);
-			free(compiled);
-		}
-	} else {
-		swaylock_log(
-			LOG_ERROR, "%s: Unknown file type for custom effect (expected .c or .so)",
-			path);
-	}
-}
-
 static cairo_surface_t *run_effect(cairo_surface_t *surface, int scale,
 		struct swaylock_effect *effect) {
 	switch (effect->tag) {
@@ -680,16 +505,7 @@ static cairo_surface_t *run_effect(cairo_surface_t *surface, int scale,
 		break;
 	}
 
-	case EFFECT_CUSTOM: {
-		effect_custom(
-				(uint32_t *)cairo_image_surface_get_data(surface),
-				cairo_image_surface_get_width(surface),
-				cairo_image_surface_get_height(surface),
-				scale,
-				effect->e.custom);
-		cairo_surface_flush(surface);
-		break;
-	} }
+	}
 
 	return surface;
 }
@@ -733,34 +549,3 @@ cairo_surface_t *swaylock_effects_run(cairo_surface_t *surface, int scale,
 	return surface;
 }
 
-#define TIME_MSEC(tv) ((tv).tv_sec * 1000.0 + (tv).tv_nsec / 1000000.0)
-#define TIME_DELTA(first, last) (TIME_MSEC(last) - TIME_MSEC(first))
-
-cairo_surface_t *swaylock_effects_run_timed(cairo_surface_t *surface, int scale,
-		struct swaylock_effect *effects, int count) {
-	struct timespec start_tv;
-	clock_gettime(CLOCK_MONOTONIC, &start_tv);
-
-	surface = ensure_format(surface);
-	if (surface == NULL) return NULL;
-
-	fprintf(stderr, "Running %i effects:\n", count);
-	for (int i = 0; i < count; ++i) {
-		struct timespec effect_start_tv;
-		clock_gettime(CLOCK_MONOTONIC, &effect_start_tv);
-
-		struct swaylock_effect *effect = &effects[i];
-		surface = run_effect(surface, scale, effect);
-
-		struct timespec effect_end_tv;
-		clock_gettime(CLOCK_MONOTONIC, &effect_end_tv);
-		fprintf(stderr, "    %s: %fms\n", effect_name(effect),
-				TIME_DELTA(effect_start_tv, effect_end_tv));
-	}
-
-	struct timespec end_tv;
-	clock_gettime(CLOCK_MONOTONIC, &end_tv);
-	fprintf(stderr, "Effects took %fms.\n", TIME_DELTA(start_tv, end_tv));
-
-	return surface;
-}
