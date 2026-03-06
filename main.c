@@ -853,7 +853,7 @@ static char *choose_random_image(const char *directory) {
 		}
 
 		if (file_count == 0) {
-			// We must return here, because modulo will fail otherwise.
+			closedir(dir);
 			return NULL;
 		}
 
