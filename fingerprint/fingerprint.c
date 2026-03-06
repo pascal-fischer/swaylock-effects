@@ -98,6 +98,11 @@ static void open_device(struct FingerprintState *state) {
 	state->device = g_steal_pointer (&dev);
 }
 
+static void proxy_signal_cb(GDBusProxy *proxy, const gchar *sender_name,
+		const gchar *signal_name, GVariant *parameters, gpointer user_data);
+static void release_callback(GObject *source_object, GAsyncResult *res,
+		gpointer user_data);
+
 static void verify_result(GObject *object, const char *result, gboolean done, void *user_data) {
 	struct FingerprintState *state = user_data;
 	swaylock_log(LOG_INFO, "Verify result: %s (%s)", result, done ? "done" : "not done");
@@ -113,6 +118,25 @@ static void verify_result(GObject *object, const char *result, gboolean done, vo
 		return;
 	} else if (g_str_equal(result, "verify-remove-and-retry")) {
 		display_message(state, "Remove and retry");
+		return;
+	}
+
+	if (g_str_equal(result, "verify-disconnected") ||
+	    g_str_equal(result, "verify-unknown-error")) {
+		swaylock_log(LOG_INFO, "Fingerprint device error/disconnect (%s), deactivating", result);
+		GError *err = NULL;
+		fprint_dbus_device_call_verify_stop_sync(state->device, NULL, &err);
+		if (err) {
+			swaylock_log(LOG_DEBUG, "VerifyStop on error: %s", err->message);
+			g_error_free(err);
+		}
+		g_signal_handlers_disconnect_by_func(state->device, proxy_signal_cb, state);
+		fprint_dbus_device_call_release(state->device, NULL, release_callback, NULL);
+		g_clear_object(&state->device);
+		state->started = FALSE;
+		state->completed = FALSE;
+		state->active = 0;
+		display_message(state, "Press ESC to retry fingerprint");
 		return;
 	}
 
@@ -197,6 +221,7 @@ static void release_callback(GObject *source_object, GAsyncResult *res,
 void fingerprint_init(struct FingerprintState *fingerprint_state,
 					  struct swaylock_state *swaylock_state) {
 	memset(fingerprint_state, 0, sizeof(struct FingerprintState));
+	fingerprint_state->active = 1; /* default on; --fingerprint-on-demand overrides to 0 */
 	fingerprint_state->sw_state = swaylock_state;
 	create_manager(fingerprint_state);
 	if (fingerprint_state->manager == NULL || fingerprint_state->connection == NULL) {
@@ -207,6 +232,9 @@ void fingerprint_init(struct FingerprintState *fingerprint_state,
 int fingerprint_verify(struct FingerprintState *fingerprint_state) {
 	/* VerifyStatus signals are processing, do not wait for completion. */
 	g_main_context_iteration (NULL, FALSE);
+	if (!fingerprint_state->active) {
+		return false;
+	}
 	if (fingerprint_state->manager == NULL ||
 		fingerprint_state->connection == NULL) {
 		return false;

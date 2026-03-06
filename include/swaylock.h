@@ -83,6 +83,7 @@ struct swaylock_args {
 	bool password_grace_no_mouse;
 	bool password_grace_no_touch;
 	bool fingerprint;
+	bool fingerprint_on_demand;
 
 	char *text_cleared;
 	char *text_caps_lock;
@@ -122,6 +123,7 @@ struct swaylock_state {
 	struct ext_session_lock_manager_v1 *ext_session_lock_manager_v1;
 	struct ext_session_lock_v1 *ext_session_lock_v1;
 	char *fingerprint_msg;
+	int *fingerprint_active; /* points into FingerprintState.active; set nonzero to start scanning */
 };
 
 struct swaylock_surface {

@@ -1052,6 +1052,7 @@ static int parse_options(int argc, char **argv, struct swaylock_state *state,
 		LO_GRACE,
 		LO_GRACE_NO_MOUSE,
 		LO_GRACE_NO_TOUCH,
+		LO_FINGERPRINT_ON_DEMAND,
 	};
 
 	static struct option long_options[] = {
@@ -1135,6 +1136,9 @@ static int parse_options(int argc, char **argv, struct swaylock_state *state,
 		{"grace", required_argument, NULL, LO_GRACE},
 		{"grace-no-mouse", no_argument, NULL, LO_GRACE_NO_MOUSE},
 		{"grace-no-touch", no_argument, NULL, LO_GRACE_NO_TOUCH},
+#if HAVE_FINGERPRINT
+		{"fingerprint-on-demand", no_argument, NULL, 'P'},
+#endif
 		{0, 0, 0, 0}
 	};
 
@@ -1182,6 +1186,9 @@ static int parse_options(int argc, char **argv, struct swaylock_state *state,
 #if HAVE_FINGERPRINT
 		"  -p, --fingerprint                "
 			"Enable fingerprint scanning. Fprint is required.\n"
+		"  -P, --fingerprint-on-demand      "
+			"Use this for external scanners that only work for ~2 minutes.\n"
+			"                               Press C-u or ESC to start the scanner.\n"
 #endif
 		"  -s, --scaling <mode>             "
 			"Image scaling mode: stretch, fill, fit, center, tile, solid_color.\n"
@@ -1740,6 +1747,14 @@ static int parse_options(int argc, char **argv, struct swaylock_state *state,
 				state->args.password_grace_no_touch = true;
 			}
 			break;
+#if HAVE_FINGERPRINT
+		case 'P':
+			if (state) {
+				state->args.fingerprint = true;
+				state->args.fingerprint_on_demand = true;
+			}
+			break;
+#endif
 		default:
 			fprintf(stderr, "%s", usage);
 			return 1;
@@ -2111,7 +2126,12 @@ int main(int argc, char **argv) {
 	struct FingerprintState fingerprint_state;
 	if (state.args.fingerprint) {
 		fingerprint_init(&fingerprint_state, &state);
-		loop_add_timer(state.eventloop, 100, check_fingerprint, &fingerprint_state);
+		if (state.args.fingerprint_on_demand) {
+			fingerprint_state.active = 0;
+			state.fingerprint_active = &fingerprint_state.active;
+		}
+		loop_add_timer(state.eventloop, 100, check_fingerprint,
+			&fingerprint_state);
 	}
 #endif
 

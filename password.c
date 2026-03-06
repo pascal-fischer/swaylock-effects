@@ -140,6 +140,9 @@ void swaylock_handle_key(struct swaylock_state *state,
 		clear_password_buffer(&state->password);
 		state->auth_state = AUTH_STATE_CLEAR;
 		state->indicator_dirty = true;
+		if (state->fingerprint_active) {
+			*state->fingerprint_active = 1;
+		}
 		schedule_indicator_clear(state);
 		break;
 	case XKB_KEY_Caps_Lock:
@@ -171,6 +174,9 @@ void swaylock_handle_key(struct swaylock_state *state,
 		if (state->xkb.control) {
 			clear_password_buffer(&state->password);
 			state->auth_state = AUTH_STATE_CLEAR;
+			if (state->fingerprint_active) {
+				*state->fingerprint_active = 1;
+			}
 			damage_state(state);
 			schedule_indicator_clear(state);
 			break;
