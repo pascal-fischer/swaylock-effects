@@ -5,9 +5,9 @@ which adds built-in screenshots and image manipulation effects like blurring.
 It's inspired by [i3lock-color](https://github.com/PandorasFox/i3lock-color),
 although the feature sets aren't perfectly overlapping.
 
-This repository ([jirutka/swaylock-effects](https://github.com/jirutka/swaylock-effects))
-is a fork of [mortie/swaylock-effects](https://github.com/mortie/swaylock-effects)
-which is no longer maintained.
+This repository is a fork of [jirutka/swaylock-effects](https://github.com/jirutka/swaylock-effects)
+which in its turn is a fork of [mortie/swaylock-effects](https://github.com/mortie/swaylock-effects),
+ both are no longer maintained.
 
 ![Screenshot](https://raw.githubusercontent.com/jirutka/swaylock-effects/master/screenshot.png)
 
