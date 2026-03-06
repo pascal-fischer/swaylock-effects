@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <cairo/cairo.h>
 #include "cairo.h"
@@ -38,6 +39,10 @@ cairo_surface_t *cairo_surface_duplicate(cairo_surface_t *src) {
 	cairo_format_t format = cairo_image_surface_get_format(src);
 
 	void *new_data = malloc(stride * height);
+	if (!new_data) {
+		fprintf(stderr, "swaylock: Unable to allocate memory for surface duplication\n");
+		return NULL;
+	}
 	memcpy(new_data, cairo_image_surface_get_data(src), stride * height);
 
 	return cairo_image_surface_create_for_data(new_data, format, width, height, stride);
