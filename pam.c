@@ -96,7 +96,7 @@ void run_pw_backend_child(void) {
 			break;
 		}
 
-		int pam_status = pam_authenticate(auth_handle, 0);
+		pam_status = pam_authenticate(auth_handle, 0);
 		password_buffer_destroy(pw_buf, size);
 		pw_buf = NULL;
 
