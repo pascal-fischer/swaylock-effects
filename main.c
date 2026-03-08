@@ -2116,6 +2116,7 @@ int main(int argc, char **argv) {
 	struct FingerprintState fingerprint_state;
 	if (state.args.fingerprint) {
 		fingerprint_init(&fingerprint_state, &state);
+		fingerprint_state.on_demand = state.args.fingerprint_on_demand;
 		if (state.args.fingerprint_on_demand) {
 			fingerprint_state.active = 0;
 			state.fingerprint_active = &fingerprint_state.active;
