@@ -24,6 +24,9 @@ Locks your Wayland session.
 *-d, --debug*
 	Enable debugging output.
 
+*-t, --trace*
+	Enable tracing output.
+
 *-e, --ignore-empty-password*
 	When an empty password is provided, do not validate it.
 
@@ -97,6 +100,13 @@ Locks your Wayland session.
 
 *-l, --indicator-caps-lock*
 	Show the current Caps Lock state also on the indicator.
+
+*-p, --fingerprint*
+	Enable fingerprint scanning. Fprint is required.
+
+*-P, --fingerprint-on-demand*
+	Use this for external scanners that only work for ~2 minutes.
+	Press C-u or ESC to start the scanner.
 
 *-s, --scaling*
 	Image scaling mode: _stretch_, _fill_, _fit_, _center_, _tile_,
@@ -267,7 +277,8 @@ Locks your Wayland session.
 
 # AUTHORS
 
-Maintained by Jakub Jirutka. This is a fork of the upstream Swaylock, which is
-maintained by Simon Ser, and it was originally forked by Martin Dørum.
-For more information about swaylock-effects development, see
-https://github.com/jirutka/swaylock-effects.
+Originally written by Simon Ser as swaylock, part of the Sway project.
+Forked as swaylock-effects by Martin Dørum, who added the visual effects.
+Further maintained by Jakub Jirutka.
+Currently maintained by Han Boetes <hboetes@gmail.com>.
+For more information, see https://github.com/hboetes/swaylock-effects.

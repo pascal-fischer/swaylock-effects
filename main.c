@@ -1291,6 +1291,8 @@ static int parse_options(int argc, char **argv, struct swaylock_state *state,
 			"Make images greyscale.\n"
 		"  --effect-vignette <base>:<factor>"
 			"Apply a vignette effect to images. Base and factor should be numbers between 0 and 1.\n"
+		"  --effect-compose <position>;<size>;<gravity>;<path>"
+			"Overlay another image to your lock screen.\n"
 		"\n"
 		"All <color> options are of the form <rrggbb[aa]>.\n";
 
