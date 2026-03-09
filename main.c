@@ -742,6 +742,12 @@ static void handle_screencopy_frame_flags(void *data,
 	}
 }
 
+static void disable_surface_fade(struct swaylock_surface *surface) {
+	surface->fade.target_time = 0;
+	surface->fade.current_time = 0;
+	surface->fade.alpha = 1;
+}
+
 static void handle_screencopy_frame_ready(void *data,
 		struct zwlr_screencopy_frame_v1 *frame, uint32_t tv_sec_hi,
 		uint32_t tv_sec_lo, uint32_t tv_nsec) {
@@ -765,6 +771,12 @@ static void handle_screencopy_frame_ready(void *data,
 		surface->screencopy.image = NULL;
 	} else  {
 		surface->screencopy.original_image = cairo_surface_duplicate(image);
+		if (!surface->screencopy.original_image) {
+			swaylock_log(LOG_ERROR,
+					"Failed to duplicate screenshot image; disabling fade-in for output %s",
+					surface->output_name ? surface->output_name : "*");
+			disable_surface_fade(surface);
+		}
 		surface->screencopy.image->cairo_surface = image;
 		if (state->args.screenshots) {
 			swaylock_log(LOG_DEBUG, "Loaded screenshot for output %s", surface->output_name);
@@ -822,6 +834,7 @@ static void handle_wl_output_done(void *data, struct wl_output *output) {
 				"screenshots / fade-in will not work");
 		state->args.screenshots = false;
 		state->args.fade_in = 0; // Fade in is not possible without screenshot
+		disable_surface_fade(surface);
 		has_printed_screencopy_error = true;
 	}
 
@@ -1471,7 +1484,7 @@ static int parse_options(int argc, char **argv, struct swaylock_state *state,
 	optind = 1;
 	while (1) {
 		int opt_idx = 0;
-		c = getopt_long(argc, argv, "c:deFfhi:SkKLlnprs:tuvC:", long_options,
+		c = getopt_long(argc, argv, "c:deFfhi:SkKLlnpPrs:tuvC:", long_options,
 				&opt_idx);
 		if (c == -1) {
 			break;
@@ -2281,6 +2294,7 @@ int main(int argc, char **argv) {
 	struct FingerprintState fingerprint_state;
 	if (state.args.fingerprint) {
 		fingerprint_init(&fingerprint_state, &state);
+		fingerprint_state.on_demand = state.args.fingerprint_on_demand;
 		if (state.args.fingerprint_on_demand) {
 			fingerprint_state.active = 0;
 			state.fingerprint_active = &fingerprint_state.active;
