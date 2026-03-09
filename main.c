@@ -247,6 +247,8 @@ static void daemonize_done(void *fdptr) {
 	*fd = -1;
 }
 
+static int sigusr_fds[2] = {-1, -1};
+
 static void destroy_image(struct swaylock_image *image) {
 	if (image == NULL) {
 		return;
@@ -325,6 +327,70 @@ static void destroy_surface(struct swaylock_surface *surface) {
 	wl_output_destroy(surface->output);
 	free(surface->output_name);
 	free(surface);
+}
+
+static void destroy_effects(struct swaylock_effect *effects, int count) {
+	if (effects == NULL) {
+		return;
+	}
+	for (int i = 0; i < count; ++i) {
+		if (effects[i].tag == EFFECT_COMPOSE) {
+			free(effects[i].e.compose.imgpath);
+		}
+	}
+	free(effects);
+}
+
+static void destroy_args(struct swaylock_args *args) {
+	destroy_effects(args->effects, args->effects_count);
+	free(args->font);
+	free(args->timestr);
+	free(args->datestr);
+	free(args->text_cleared);
+	free(args->text_caps_lock);
+	free(args->text_verifying);
+	free(args->text_wrong);
+}
+
+static void destroy_state_resources(struct swaylock_state *state) {
+	struct swaylock_surface *surface, *next_surface;
+	wl_list_for_each_safe(surface, next_surface, &state->surfaces, link) {
+		destroy_surface(surface);
+	}
+	struct swaylock_image *image, *next_image;
+	wl_list_for_each_safe(image, next_image, &state->images, link) {
+		destroy_image(image);
+	}
+	if (state->indicator_image != NULL) {
+		cairo_surface_destroy(state->indicator_image);
+	}
+	if (state->password.buffer != NULL) {
+		password_buffer_destroy(state->password.buffer, state->password.buffer_len);
+	}
+	if (state->xkb.state != NULL) {
+		xkb_state_unref(state->xkb.state);
+	}
+	if (state->xkb.keymap != NULL) {
+		xkb_keymap_unref(state->xkb.keymap);
+	}
+	if (state->xkb.context != NULL) {
+		xkb_context_unref(state->xkb.context);
+	}
+	if (state->eventloop != NULL) {
+		loop_destroy(state->eventloop);
+	}
+	if (state->display != NULL) {
+		wl_display_disconnect(state->display);
+	}
+	if (sigusr_fds[0] >= 0) {
+		close(sigusr_fds[0]);
+		sigusr_fds[0] = -1;
+	}
+	if (sigusr_fds[1] >= 0) {
+		close(sigusr_fds[1]);
+		sigusr_fds[1] = -1;
+	}
+	destroy_args(&state->args);
 }
 
 static const struct zwlr_layer_surface_v1_listener layer_surface_listener;
@@ -851,8 +917,6 @@ static const struct wl_registry_listener registry_listener = {
 	.global = handle_global,
 	.global_remove = handle_global_remove,
 };
-
-static int sigusr_fds[2] = {-1, -1};
 
 void do_sigusr(int sig) {
 	(void)write(sigusr_fds[1], "1", 1);
@@ -2047,13 +2111,16 @@ int main(int argc, char **argv) {
 		.text_wrong = strdup("Wrong"),
 	};
 	wl_list_init(&state.images);
+	wl_list_init(&state.surfaces);
 	set_default_colors(&state.args.colors);
 
 	char *config_path = NULL;
 	int result = parse_options(argc, argv, NULL, NULL, &config_path);
+	int exit_code = 0;
 	if (result != 0) {
 		free(config_path);
-		return result;
+		exit_code = result;
+		goto cleanup;
 	}
 	if (!config_path) {
 		config_path = get_config_path();
@@ -2064,8 +2131,8 @@ int main(int argc, char **argv) {
 		int config_status = load_config(config_path, &state, &line_mode);
 		free(config_path);
 		if (config_status != 0) {
-			free(state.args.font);
-			return config_status;
+			exit_code = config_status;
+			goto cleanup;
 		}
 	}
 
@@ -2073,8 +2140,8 @@ int main(int argc, char **argv) {
 		swaylock_log(LOG_DEBUG, "Parsing CLI Args");
 		int result = parse_options(argc, argv, &state, &line_mode, NULL);
 		if (result != 0) {
-			free(state.args.font);
-			return result;
+			exit_code = result;
+			goto cleanup;
 		}
 	}
 
@@ -2092,23 +2159,24 @@ int main(int argc, char **argv) {
 	state.password.buffer_len = 1024;
 	state.password.buffer = password_buffer_create(state.password.buffer_len);
 	if (!state.password.buffer) {
-		return EXIT_FAILURE;
+		exit_code = EXIT_FAILURE;
+		goto cleanup;
 	}
 
 	if (pipe(sigusr_fds) != 0) {
 		swaylock_log(LOG_ERROR, "Failed to pipe");
-		return 1;
+		exit_code = 1;
+		goto cleanup;
 	}
 
-	wl_list_init(&state.surfaces);
 	state.xkb.context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 	state.display = wl_display_connect(NULL);
 	if (!state.display) {
-		free(state.args.font);
 		swaylock_log(LOG_ERROR, "Unable to connect to the compositor. "
 				"If your compositor is running, check or set the "
 				"WAYLAND_DISPLAY environment variable.");
-		return EXIT_FAILURE;
+		exit_code = EXIT_FAILURE;
+		goto cleanup;
 	}
 
 	struct wl_registry *registry = wl_display_get_registry(state.display);
@@ -2117,17 +2185,20 @@ int main(int argc, char **argv) {
 
 	if (!state.compositor) {
 		swaylock_log(LOG_ERROR, "Missing wl_compositor");
-		return 1;
+		exit_code = 1;
+		goto cleanup;
 	}
 
 	if (!state.subcompositor) {
 		swaylock_log(LOG_ERROR, "Missing wl_subcompositor");
-		return 1;
+		exit_code = 1;
+		goto cleanup;
 	}
 
 	if (!state.shm) {
 		swaylock_log(LOG_ERROR, "Missing wl_shm");
-		return 1;
+		exit_code = 1;
+		goto cleanup;
 	}
 
 	struct swaylock_surface *surface;
@@ -2170,17 +2241,19 @@ int main(int argc, char **argv) {
 	} else {
 		swaylock_log(LOG_ERROR, "Missing ext-session-lock-v1, wlr-layer-shell "
 				"and wlr-input-inhibitor");
-		return 1;
+		exit_code = 1;
+		goto cleanup;
 	}
 
 	if (wl_display_roundtrip(state.display) == -1) {
-		free(state.args.font);
 		if (state.input_inhibit_manager) {
 			swaylock_log(LOG_ERROR, "Exiting - failed to inhibit input:"
 					" is another lockscreen already running?");
-			return 2;
+			exit_code = 2;
+		} else {
+			exit_code = 1;
 		}
-		return 1;
+		goto cleanup;
 	}
 
 	wl_list_for_each(surface, &state.surfaces, link) {
@@ -2257,17 +2330,9 @@ int main(int argc, char **argv) {
 	}
 #endif
 
-	struct swaylock_surface *next_surface;
-	wl_list_for_each_safe(surface, next_surface, &state.surfaces, link) {
-		destroy_surface(surface);
-	}
-	struct swaylock_image *image, *next_image;
-	wl_list_for_each_safe(image, next_image, &state.images, link) {
-		destroy_image(image);
-	}
-	if (state.indicator_image != NULL) {
-		cairo_surface_destroy(state.indicator_image);
-	}
-	free(state.args.font);
-	return 0;
+	goto cleanup;
+
+cleanup:
+	destroy_state_resources(&state);
+	return exit_code;
 }
