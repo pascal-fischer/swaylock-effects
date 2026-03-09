@@ -1,7 +1,15 @@
 name: CI
 on:
-  - push
-  - pull_request
+  push:
+    paths-ignore:
+      - '**.md'
+      - '**.scd'
+      - '**.xml'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - '**.scd'
+      - '**.xml'
 
 jobs:
   build-alpine:
@@ -36,7 +44,7 @@ jobs:
 
       - name: Build
         run: |
-          meson -Dgdk-pixbuf=disabled . output
+          meson setup -Dgdk-pixbuf=disabled . output
           meson compile -C output --verbose
         shell: alpine.sh {0}
 
