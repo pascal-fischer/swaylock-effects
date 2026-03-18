@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200809L
+#define _GNU_SOURCE
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -294,6 +294,13 @@ static void destroy_surface(struct swaylock_surface *surface) {
 	swaylock_log(LOG_DEBUG, "Destroy surface for output %s", surface->output_name);
 
 	wl_list_remove(&surface->link);
+
+	// Destroy pending frame callback to prevent use-after-free
+	if (surface->frame_callback != NULL) {
+		wl_callback_destroy(surface->frame_callback);
+		surface->frame_callback = NULL;
+	}
+
 	destroy_screencopy_buffer(surface);
 	if (surface->layer_surface != NULL) {
 		zwlr_layer_surface_v1_destroy(surface->layer_surface);
@@ -324,7 +331,8 @@ static void destroy_surface(struct swaylock_surface *surface) {
 	destroy_buffer(&surface->buffers[1]);
 	destroy_buffer(&surface->indicator_buffers[0]);
 	destroy_buffer(&surface->indicator_buffers[1]);
-	wl_output_destroy(surface->output);
+	// Use wl_output_release (v3+) to properly notify compositor
+	wl_output_release(surface->output);
 	free(surface->output_name);
 	free(surface);
 }
@@ -531,12 +539,14 @@ static void surface_frame_handle_done(void *data, struct wl_callback *callback,
 	struct swaylock_surface *surface = data;
 
 	wl_callback_destroy(callback);
+	surface->frame_callback = NULL;
 	surface->frame_pending = false;
 
 	if (surface->dirty) {
 		// Schedule a frame in case the surface is damaged again
-		struct wl_callback *callback = wl_surface_frame(surface->surface);
-		wl_callback_add_listener(callback, &surface_frame_listener, surface);
+		struct wl_callback *cb = wl_surface_frame(surface->surface);
+		wl_callback_add_listener(cb, &surface_frame_listener, surface);
+		surface->frame_callback = cb;
 		surface->frame_pending = true;
 		surface->dirty = false;
 
@@ -564,8 +574,9 @@ void damage_surface(struct swaylock_surface *surface) {
 		return;
 	}
 
-	struct wl_callback *callback = wl_surface_frame(surface->surface);
-	wl_callback_add_listener(callback, &surface_frame_listener, surface);
+	struct wl_callback *cb = wl_surface_frame(surface->surface);
+	wl_callback_add_listener(cb, &surface_frame_listener, surface);
+	surface->frame_callback = cb;
 	surface->frame_pending = true;
 	wl_surface_commit(surface->surface);
 }
@@ -609,19 +620,13 @@ static struct wl_buffer *create_shm_buffer(struct wl_shm *shm, enum wl_shm_forma
 		int width, int height, int stride, void **data_out) {
 	int size = stride * height;
 
-	const char shm_name[] = "/swaylock-shm";
-	int fd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+	int fd = memfd_create("swaylock-screencopy", MFD_CLOEXEC);
 	if (fd < 0) {
-		fprintf(stderr, "shm_open failed\n");
+		fprintf(stderr, "memfd_create failed\n");
 		return NULL;
 	}
-	shm_unlink(shm_name);
 
-	int ret;
-	while ((ret = ftruncate(fd, size)) == EINTR) {
-		// No-op
-	}
-	if (ret < 0) {
+	if (ftruncate(fd, size) < 0) {
 		close(fd);
 		fprintf(stderr, "ftruncate failed\n");
 		return NULL;
@@ -822,6 +827,13 @@ static void handle_wl_output_done(void *data, struct wl_output *output) {
 	struct swaylock_surface *surface = data;
 	struct swaylock_state *state = surface->state;
 
+	// Only capture screenshots during initial enumeration (events_pending > 0).
+	// Subsequent done events (e.g., after DPMS cycle) should not trigger
+	// new screencopy captures which can race with surface destruction.
+	if (surface->events_pending <= 0) {
+		return;
+	}
+
 	static bool has_printed_screencopy_error = false;
 	if (state->screencopy_manager) {
 		surface->screencopy_frame = zwlr_screencopy_manager_v1_capture_output(
@@ -917,8 +929,8 @@ static void handle_global(void *data, struct wl_registry *registry,
 static void handle_global_remove(void *data, struct wl_registry *registry,
 		uint32_t name) {
 	struct swaylock_state *state = data;
-	struct swaylock_surface *surface;
-	wl_list_for_each(surface, &state->surfaces, link) {
+	struct swaylock_surface *surface, *tmp;
+	wl_list_for_each_safe(surface, tmp, &state->surfaces, link) {
 		if (surface->output_global_name == name) {
 			destroy_surface(surface);
 			break;
